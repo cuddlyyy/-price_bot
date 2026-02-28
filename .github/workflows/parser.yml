@@ -1,0 +1,73 @@
+name: Price Parser
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'  # Каждые 4 часа
+  workflow_dispatch:  # Ручной запуск
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests beautifulsoup4 python-telegram-bot python-dotenv fake-useragent
+    
+    - name: Create data directory
+      run: mkdir -p data
+    
+    - name: Run Wildberries parser
+      run: python parsers/wildberries.py
+      continue-on-error: true
+      env:
+        IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+    
+    - name: Run Ozon parser
+      run: python parsers/ozon.py
+      continue-on-error: true
+      env:
+        IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+    
+    - name: Run AliExpress parser
+      run: python parsers/aliexpress.py
+      continue-on-error: true
+      env:
+        IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+    
+    - name: Run DNS parser
+      run: python parsers/dns.py
+      continue-on-error: true
+      env:
+        IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+    
+    - name: Run Yandex Market parser
+      run: python parsers/yandex.py
+      continue-on-error: true
+      env:
+        IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+    
+    - name: Merge all products
+      run: python utils/merge_products.py
+    
+    - name: Post to Telegram channel
+      run: python utils/channel_poster.py
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      continue-on-error: true
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "bot@github.com"
+        git config --local user.name "Price Bot"
+        git add data/
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update prices [skip ci]"
+        git push
